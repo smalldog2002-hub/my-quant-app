@@ -10,8 +10,12 @@ from io import BytesIO
 from PIL import Image
 
 # ==========================================
-# 0. 安全配置 (环境变量模式)
+# 0. 安全配置 (完全依赖 Secrets)
 # ==========================================
+# 从 Streamlit Secrets 中读取加密变量
+# 请确保已在 Streamlit Cloud 的 Settings -> Secrets 中添加了：
+# GEMINI_API_KEY = "你的Key"
+# TUSHARE_TOKEN = "你的Token"
 try:
     SEC_GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "")
     SEC_TS_TOKEN = st.secrets.get("TUSHARE_TOKEN", "")
@@ -20,23 +24,7 @@ except Exception:
     SEC_TS_TOKEN = ""
 
 # ==========================================
-# 1. 注入自定义 CSS (隐藏密码框的“眼睛”图标)
-# ==========================================
-def hide_password_eye():
-    st.markdown(
-        """
-        <style>
-        /* 隐藏密码输入框右侧的显示/隐藏切换按钮（眼睛图标） */
-        button[data-testid="stTextInputPasswordFieldVisibilityToggle"] {
-            display: none !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-# ==========================================
-# 2. 数据驱动引擎 (Tushare API)
+# 1. 数据驱动引擎 (Tushare API)
 # ==========================================
 class TushareEngine:
     @staticmethod
@@ -67,7 +55,7 @@ class TushareEngine:
         return code
 
 # ==========================================
-# 3. 核心 AI 诊断引擎 (Gemini 2.5 Flash Preview)
+# 2. 核心 AI 诊断引擎 (Gemini 2.5 Flash Preview)
 # ==========================================
 class GeminiAnalyst:
     @staticmethod
@@ -88,7 +76,7 @@ class GeminiAnalyst:
     @staticmethod
     def analyze_stock(prompt, api_key, images_base64=None, persona="平衡派", use_search=True, use_radar=True):
         if not api_key:
-            return "❌ 未检测到 API Key。请在侧边栏高级设置中手动输入或在后台配置 Secrets。", []
+            return "❌ 系统后台未配置 API Key。请在 Streamlit Cloud 后台配置 Secrets。", []
 
         model_id = "gemini-2.5-flash-preview-09-2025" 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key}"
@@ -127,11 +115,10 @@ class GeminiAnalyst:
         return "诊断服务暂时无法连接，请重试。", []
 
 # ==========================================
-# 4. UI 界面逻辑
+# 3. UI 界面逻辑
 # ==========================================
 def main_app():
     st.set_page_config(page_title="Gemini 2.5 视觉量化系统", layout="wide", page_icon="📈")
-    hide_password_eye() # 调用 CSS 隐藏函数
     
     # 初始化状态
     if 'stock_data' not in st.session_state:
@@ -141,21 +128,23 @@ def main_app():
     if 'chat_history' not in st.session_state: st.session_state.chat_history = []
 
     st.title("🚀 Gemini 2.5 视觉量化诊断系统")
-    st.caption("核心能力：数据同步 | 2.5 Preview 引擎 | 联网搜索 | 研报导出 (GitHub 安全版)")
+    st.caption("核心能力：Secrets 安全加密 | 2.5 Preview 引擎 | 联网搜索 | 研报导出")
     st.markdown("---")
     
     with st.sidebar:
-        # 将密钥输入隐藏在折叠器内
-        with st.expander("🛠️ 高级接口设置 (已隐藏)", expanded=False):
-            st.info("系统已自动加载云端 Secrets。如需覆盖，请在下方输入。")
-            user_gemini_key = st.text_input("Gemini API Key", value=SEC_GEMINI_KEY, type="password", placeholder="请输入密钥")
-            user_ts_token = st.text_input("Tushare Token", value=SEC_TS_TOKEN, type="password", placeholder="请输入 Token")
-        
-        if not user_gemini_key:
-            st.error("⚠️ 未检测到 Gemini 密钥，请在上方高级设置中配置。")
-
+        st.header("🛡️ 系统运行状态")
+        if SEC_GEMINI_KEY:
+            st.success("● Gemini 引擎：已连接")
+        else:
+            st.error("○ Gemini 引擎：未配置")
+            
+        if SEC_TS_TOKEN:
+            st.success("● 数据同步器：已就绪")
+        else:
+            st.warning("○ 数据同步器：未配置")
+            
         st.divider()
-        persona = st.radio("专家诊断风格：", ["平衡派", "价值派", "技术派"], index=0)
+        persona = st.radio("专家诊断风格选择：", ["平衡派", "价值派", "技术派"], index=0)
         
         st.divider()
         st.header("🧮 风险管理")
@@ -179,20 +168,20 @@ def main_app():
         with sc2:
             st.write("")
             if st.button("🛰️ 同步数据"):
-                if not user_ts_token: st.warning("请在高级设置中配置 Tushare Token")
+                if not SEC_TS_TOKEN: st.error("后台未配置 Tushare Token")
                 elif not stock_code: st.warning("请输入代码")
                 else:
-                    with st.spinner("从 Tushare 抓取数据中..."):
+                    with st.spinner("实时数据抓取中..."):
                         f_code = TushareEngine.format_code(stock_code)
-                        d = TushareEngine.get_data("daily", user_ts_token, {"ts_code": f_code, "limit": 1})
-                        b = TushareEngine.get_data("daily_basic", user_ts_token, {"ts_code": f_code, "limit": 1})
+                        d = TushareEngine.get_data("daily", SEC_TS_TOKEN, {"ts_code": f_code, "limit": 1})
+                        b = TushareEngine.get_data("daily_basic", SEC_TS_TOKEN, {"ts_code": f_code, "limit": 1})
                         if d is not None and not d.empty:
                             st.session_state.stock_data["price"] = float(d.iloc[0]['close'])
                             st.session_state.stock_data["change"] = float(d.iloc[0]['pct_chg'])
                         if b is not None and not b.empty:
                             st.session_state.stock_data["pe"] = float(b.iloc[0]['pe_ttm'])
                             st.session_state.stock_data["pb"] = float(b.iloc[0]['pb'])
-                        st.success("数据补全成功！")
+                        st.success("数据补齐成功！")
                         st.rerun()
 
         with st.form("main_form"):
@@ -229,15 +218,15 @@ def main_app():
             st.rerun()
 
         if submit_diagnosis:
-            if not user_gemini_key:
-                st.error("❌ 密钥缺失。")
+            if not SEC_GEMINI_KEY:
+                st.error("❌ 诊断失败：后台未配置 API Key。")
             elif not name_input:
-                st.error("请输入目标名称。")
+                st.error("请输入名称。")
             else:
                 with st.spinner("AI 专家正在扫描并执行联网搜索..."):
                     imgs_b64 = GeminiAnalyst.process_images(up_files) if up_files else None
                     prompt_text = f"目标:{name_input}, 价格:{price_input}, 涨跌:{chg_input}%, PE:{pe_input}, PB:{pb_input}, ROE:{roe_input}%, 行业:{industry_input}, 趋势:{ma_input}, 量能:{vol_input}"
-                    res_text, src_links = GeminiAnalyst.analyze_stock(prompt_text, user_gemini_key, imgs_b64, persona=persona, use_search=enable_search, use_radar=enable_radar)
+                    res_text, src_links = GeminiAnalyst.analyze_stock(prompt_text, SEC_GEMINI_KEY, imgs_b64, persona=persona, use_search=enable_search, use_radar=enable_radar)
                     st.session_state.last_report = res_text
                     st.divider()
                     st.success(f"📈 {name_input} 投研诊断研报")
@@ -268,7 +257,7 @@ def main_app():
                 with st.chat_message("assistant"):
                     with st.spinner("专家正在思考..."):
                         follow_up_prompt = f"基于报告：\n{st.session_state.last_report}\n\n回答：{query_input}"
-                        ans_text, _ = GeminiAnalyst.analyze_stock(follow_up_prompt, user_gemini_key, persona=persona)
+                        ans_text, _ = GeminiAnalyst.analyze_stock(follow_up_prompt, SEC_GEMINI_KEY, persona=persona)
                         st.markdown(ans_text)
                         st.session_state.chat_history.append({"role": "assistant", "content": ans_text})
 
