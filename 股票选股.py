@@ -12,11 +12,6 @@ from PIL import Image
 # ==========================================
 # 0. 安全配置 (环境变量模式)
 # ==========================================
-# 🚨 重要：请勿在此处填写真实的 Key，请通过 Streamlit Cloud 后台的 Secrets 菜单配置：
-# GEMINI_API_KEY = "你的GEMINI密钥"
-# TUSHARE_TOKEN = "你的TUSHARE密钥"
-
-# 尝试从 Streamlit Secrets 中读取加密变量，如果读取不到则留空
 try:
     SEC_GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "")
     SEC_TS_TOKEN = st.secrets.get("TUSHARE_TOKEN", "")
@@ -25,7 +20,23 @@ except Exception:
     SEC_TS_TOKEN = ""
 
 # ==========================================
-# 1. 数据驱动引擎 (Tushare API)
+# 1. 注入自定义 CSS (隐藏密码框的“眼睛”图标)
+# ==========================================
+def hide_password_eye():
+    st.markdown(
+        """
+        <style>
+        /* 隐藏密码输入框右侧的显示/隐藏切换按钮（眼睛图标） */
+        button[data-testid="stTextInputPasswordFieldVisibilityToggle"] {
+            display: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# ==========================================
+# 2. 数据驱动引擎 (Tushare API)
 # ==========================================
 class TushareEngine:
     @staticmethod
@@ -56,7 +67,7 @@ class TushareEngine:
         return code
 
 # ==========================================
-# 2. 核心 AI 诊断引擎 (Gemini 2.5 Flash Preview)
+# 3. 核心 AI 诊断引擎 (Gemini 2.5 Flash Preview)
 # ==========================================
 class GeminiAnalyst:
     @staticmethod
@@ -77,7 +88,7 @@ class GeminiAnalyst:
     @staticmethod
     def analyze_stock(prompt, api_key, images_base64=None, persona="平衡派", use_search=True, use_radar=True):
         if not api_key:
-            return "❌ 未检测到 API Key。请在侧边栏手动输入或在后台配置 Secrets。", []
+            return "❌ 未检测到 API Key。请在侧边栏高级设置中手动输入或在后台配置 Secrets。", []
 
         model_id = "gemini-2.5-flash-preview-09-2025" 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key}"
@@ -116,10 +127,11 @@ class GeminiAnalyst:
         return "诊断服务暂时无法连接，请重试。", []
 
 # ==========================================
-# 3. UI 界面逻辑
+# 4. UI 界面逻辑
 # ==========================================
 def main_app():
     st.set_page_config(page_title="Gemini 2.5 视觉量化系统", layout="wide", page_icon="📈")
+    hide_password_eye() # 调用 CSS 隐藏函数
     
     # 初始化状态
     if 'stock_data' not in st.session_state:
@@ -133,13 +145,14 @@ def main_app():
     st.markdown("---")
     
     with st.sidebar:
-        st.header("🔑 密钥管理")
-        # 允许用户手动输入，优先使用 Secrets
-        user_gemini_key = st.text_input("Gemini API Key", value=SEC_GEMINI_KEY, type="password", placeholder="若未配置后台Secrets，请在此填入")
-        user_ts_token = st.text_input("Tushare Token", value=SEC_TS_TOKEN, type="password", placeholder="用于同步日线行情")
+        # 将密钥输入隐藏在折叠器内
+        with st.expander("🛠️ 高级接口设置 (已隐藏)", expanded=False):
+            st.info("系统已自动加载云端 Secrets。如需覆盖，请在下方输入。")
+            user_gemini_key = st.text_input("Gemini API Key", value=SEC_GEMINI_KEY, type="password", placeholder="请输入密钥")
+            user_ts_token = st.text_input("Tushare Token", value=SEC_TS_TOKEN, type="password", placeholder="请输入 Token")
         
         if not user_gemini_key:
-            st.warning("⚠️ 警告：检测到当前没有配置 API Key，程序将无法进行诊断。")
+            st.error("⚠️ 未检测到 Gemini 密钥，请在上方高级设置中配置。")
 
         st.divider()
         persona = st.radio("专家诊断风格：", ["平衡派", "价值派", "技术派"], index=0)
@@ -166,7 +179,7 @@ def main_app():
         with sc2:
             st.write("")
             if st.button("🛰️ 同步数据"):
-                if not user_ts_token: st.warning("请在侧边栏配置 Tushare Token")
+                if not user_ts_token: st.warning("请在高级设置中配置 Tushare Token")
                 elif not stock_code: st.warning("请输入代码")
                 else:
                     with st.spinner("从 Tushare 抓取数据中..."):
@@ -217,7 +230,7 @@ def main_app():
 
         if submit_diagnosis:
             if not user_gemini_key:
-                st.error("❌ 缺少 API Key，请在侧边栏填入或配置云端 Secrets。")
+                st.error("❌ 密钥缺失。")
             elif not name_input:
                 st.error("请输入目标名称。")
             else:
