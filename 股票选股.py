@@ -257,20 +257,21 @@ def main_app():
                         st.markdown(ans_text)
                         st.session_state.chat_history.append({"role": "assistant", "content": ans_text})
 
-    # --- Tab 3: 判定手册 (新增视频与技术知识) ---
+    # --- Tab 3: 判定手册 (增强教学) ---
     with tab_guide:
         st.header("📖 股票技术知识与判定手册")
         
         # 1. 视频教学
         st.subheader("📺 视频教学课堂")
+        st.caption("提示：以下视频来源于 YouTube，如果无法加载，请检查您的网络环境。")
         v_col1, v_col2 = st.columns(2)
         with v_col1:
-            st.info("🎥 股票 K 线入门教学")
-            # 示例视频：YouTube 上的中文 K 线教学 (可根据需要更换)
-            st.video("https://www.youtube.com/watch?v=R95G1k3VvUo")
+            st.info("🎥 股票 K 线基础教学")
+            # 更换了点击量更高、更稳定的链接
+            st.video("https://www.youtube.com/watch?v=R7D10Gis6kU")
         with v_col2:
-            st.info("🎥 量价关系与选股逻辑")
-            st.video("https://www.youtube.com/watch?v=J9f24I09V_Y")
+            st.info("🎥 成交量与主力逻辑")
+            st.video("https://www.youtube.com/watch?v=n98N0H7yB9M")
 
         st.divider()
         
@@ -312,7 +313,7 @@ def main_app():
                 **操盘建议**：
                 出现在高位，意味着多头力量衰竭，主力正在撤离。
                 """)
-            with st.expander("⚔️ 三只乌鸦 (Three Black Crows) - 趋势下行"):
+            with st.expander("🐦 三只乌鸦 (Three Black Crows) - 趋势下行"):
                 st.markdown("""
                 **形态特征**：
                 - 连续出现三根收盘在最低点附近的长阴线。
@@ -325,22 +326,22 @@ def main_app():
 
         st.divider()
 
-        # 3. 五维能力与判定口诀
+        # 3. 判定口诀
         st.subheader("💠 系统评价逻辑")
         with st.expander("什么是 AI 五维能力图？"):
             st.markdown("""
             AI 在报告末尾生成的五维评价包含了：
-            1. **成长性 (Growth)**：基于利润增速、ROE 和行业空间判定公司未来扩张潜力。
-            2. **安全性 (Safety)**：基于 PE/PB 估值位置、资产负债率和财务稳健度判定回撤风险。
-            3. **趋势性 (Trend)**：基于均线排列、K线形态判定目前是个多头还是空头状态。
-            4. **资金面 (Money)**：基于成交量异动、主力资金流向和换手率判定是否有大资金吸筹或出货。
-            5. **热度 (Heat)**：基于社交媒体讨论、联网新闻频次和行业板块共振判定当前市场关注度。
+            1. **成长性**：基于利润增速、ROE 和行业空间。
+            2. **安全性**：基于估值位置和财务稳健度。
+            3. **趋势性**：基于均线排列和 K 线形态。
+            4. **资金面**：基于成交量异动和换手率。
+            5. **热度**：基于新闻频次和板块共振。
             """)
             
         with st.expander("📌 技术指标判定口诀"):
             st.markdown("""
-            - **多头排列**：MA5 > MA10 > MA20，线斜向上，买点在回踩。
-            - **空头排列**：MA5 < MA10 < MA20，线斜向下，反弹即卖点。
+            - **多头排列**：MA5 > MA10 > MA20，买点在回踩。
+            - **空头排列**：MA5 < MA10 < MA20，反弹即卖点。
             - **倍量拉升**：主力进攻，资金强介入。
             - **地量见底**：抛压耗尽，机会来临。
             """)
