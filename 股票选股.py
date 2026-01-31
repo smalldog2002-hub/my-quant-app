@@ -12,10 +12,6 @@ from PIL import Image
 # ==========================================
 # 0. 安全配置 (完全依赖 Secrets)
 # ==========================================
-# 从 Streamlit Secrets 中读取加密变量
-# 请确保已在 Streamlit Cloud 的 Settings -> Secrets 中添加了：
-# GEMINI_API_KEY = "你的Key"
-# TUSHARE_TOKEN = "你的Token"
 try:
     SEC_GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "")
     SEC_TS_TOKEN = st.secrets.get("TUSHARE_TOKEN", "")
@@ -128,7 +124,7 @@ def main_app():
     if 'chat_history' not in st.session_state: st.session_state.chat_history = []
 
     st.title("🚀 Gemini 2.5 视觉量化诊断系统")
-    st.caption("核心能力：Secrets 安全加密 | 2.5 Preview 引擎 | 联网搜索 | 研报导出")
+    st.caption("核心能力：Secrets 安全加密 | 2.5 Preview 引擎 | 联网搜索 | 技术教学手册")
     st.markdown("---")
     
     with st.sidebar:
@@ -181,7 +177,7 @@ def main_app():
                         if b is not None and not b.empty:
                             st.session_state.stock_data["pe"] = float(b.iloc[0]['pe_ttm'])
                             st.session_state.stock_data["pb"] = float(b.iloc[0]['pb'])
-                        st.success("数据补齐成功！")
+                        st.success("数据补全成功！")
                         st.rerun()
 
         with st.form("main_form"):
@@ -260,6 +256,94 @@ def main_app():
                         ans_text, _ = GeminiAnalyst.analyze_stock(follow_up_prompt, SEC_GEMINI_KEY, persona=persona)
                         st.markdown(ans_text)
                         st.session_state.chat_history.append({"role": "assistant", "content": ans_text})
+
+    # --- Tab 3: 判定手册 (新增视频与技术知识) ---
+    with tab_guide:
+        st.header("📖 股票技术知识与判定手册")
+        
+        # 1. 视频教学
+        st.subheader("📺 视频教学课堂")
+        v_col1, v_col2 = st.columns(2)
+        with v_col1:
+            st.info("🎥 股票 K 线入门教学")
+            # 示例视频：YouTube 上的中文 K 线教学 (可根据需要更换)
+            st.video("https://www.youtube.com/watch?v=R95G1k3VvUo")
+        with v_col2:
+            st.info("🎥 量价关系与选股逻辑")
+            st.video("https://www.youtube.com/watch?v=J9f24I09V_Y")
+
+        st.divider()
+        
+        # 2. 经典 K 线形态
+        st.subheader("🕯️ 经典 K 线形态图解")
+        k_col1, k_col2 = st.columns(2)
+        with k_col1:
+            with st.expander("🔨 锤子线 (Hammer) - 看涨反转", expanded=True):
+                st.markdown("""
+                **形态特征**：
+                - 实体较小，位于 K 线的上端。
+                - 下影线长度至少是实体的 2 倍以上。
+                - 几乎没有上影线。
+                
+                
+                
+                **操盘建议**：
+                出现在连续下跌的底部，预示着空头抛压耗尽，主力资金在低位试探性买入。
+                """)
+            with st.expander("☀️ 启明之星 (Morning Star) - 底部确认"):
+                st.markdown("""
+                **形态特征**：
+                - 由三根 K 线组成：长阴线 + 小十字星 + 长阳线。
+                - 意味着股价由跌转平，再由平转涨。
+                
+                
+                
+                **操盘建议**：
+                典型的反转信号。如果第三根阳线伴随成交量放大，可靠性极高。
+                """)
+        with k_col2:
+            with st.expander("☁️ 乌云盖顶 (Dark Cloud Cover) - 看跌风险"):
+                st.markdown("""
+                **形态特征**：
+                - 阳线后跟一根高开的阴线，且阴线收盘价深入阳线实体一半以下。
+                
+                
+                
+                **操盘建议**：
+                出现在高位，意味着多头力量衰竭，主力正在撤离。
+                """)
+            with st.expander("⚔️ 三只乌鸦 (Three Black Crows) - 趋势下行"):
+                st.markdown("""
+                **形态特征**：
+                - 连续出现三根收盘在最低点附近的长阴线。
+                
+                
+                
+                **操盘建议**：
+                极强的看跌信号，暗示趋势已彻底转空，应坚决回避。
+                """)
+
+        st.divider()
+
+        # 3. 五维能力与判定口诀
+        st.subheader("💠 系统评价逻辑")
+        with st.expander("什么是 AI 五维能力图？"):
+            st.markdown("""
+            AI 在报告末尾生成的五维评价包含了：
+            1. **成长性 (Growth)**：基于利润增速、ROE 和行业空间判定公司未来扩张潜力。
+            2. **安全性 (Safety)**：基于 PE/PB 估值位置、资产负债率和财务稳健度判定回撤风险。
+            3. **趋势性 (Trend)**：基于均线排列、K线形态判定目前是个多头还是空头状态。
+            4. **资金面 (Money)**：基于成交量异动、主力资金流向和换手率判定是否有大资金吸筹或出货。
+            5. **热度 (Heat)**：基于社交媒体讨论、联网新闻频次和行业板块共振判定当前市场关注度。
+            """)
+            
+        with st.expander("📌 技术指标判定口诀"):
+            st.markdown("""
+            - **多头排列**：MA5 > MA10 > MA20，线斜向上，买点在回踩。
+            - **空头排列**：MA5 < MA10 < MA20，线斜向下，反弹即卖点。
+            - **倍量拉升**：主力进攻，资金强介入。
+            - **地量见底**：抛压耗尽，机会来临。
+            """)
 
 if __name__ == "__main__":
     main_app()
