@@ -10,14 +10,15 @@ from io import BytesIO
 from PIL import Image
 
 # ==========================================
-# 0. 安全配置 (完全依赖 Secrets)
+# 0. 安全配置 (初始化默认值)
 # ==========================================
 try:
-    SEC_GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "")
-    SEC_TS_TOKEN = st.secrets.get("TUSHARE_TOKEN", "")
+    # 尝试从 Secrets 读取，如果没有则为空
+    DEFAULT_GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "")
+    DEFAULT_TS_TOKEN = st.secrets.get("TUSHARE_TOKEN", "")
 except Exception:
-    SEC_GEMINI_KEY = ""
-    SEC_TS_TOKEN = ""
+    DEFAULT_GEMINI_KEY = ""
+    DEFAULT_TS_TOKEN = ""
 
 # ==========================================
 # 1. 数据驱动引擎 (Tushare API)
@@ -25,6 +26,9 @@ except Exception:
 class TushareEngine:
     @staticmethod
     def get_data(api_name, token, params, fields=""):
+        if not token:
+            st.error("❌ Tushare Token 未配置")
+            return None
         url = "http://api.tushare.pro"
         payload = {"api_name": api_name, "token": token, "params": params, "fields": fields}
         try:
@@ -72,7 +76,7 @@ class GeminiAnalyst:
     @staticmethod
     def analyze_stock(prompt, api_key, images_base64=None, persona="平衡派", use_search=True, use_radar=True):
         if not api_key:
-            return "❌ 系统后台未配置 API Key。请在 Streamlit Cloud 后台配置 Secrets。", []
+            return "❌ API Key 缺失。请在侧边栏输入有效的 Google API Key。", []
 
         model_id = "gemini-2.5-flash-preview-09-2025" 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key}"
@@ -128,13 +132,22 @@ def main_app():
     st.markdown("---")
     
     with st.sidebar:
+        st.header("🔑 API 配置")
+        # 新增：手动输入 API Key 的地方
+        manual_key = st.text_input("Google API Key (手动输入)", type="password", placeholder="在此粘贴新 Key 覆盖默认设置")
+        
+        # 逻辑：如果有手动输入的 Key，就用手动的；否则尝试用 Secrets 里的
+        effective_api_key = manual_key if manual_key else DEFAULT_GEMINI_KEY
+        
+        st.markdown("---")
         st.header("🛡️ 系统运行状态")
-        if SEC_GEMINI_KEY:
+        
+        if effective_api_key:
             st.success("● Gemini 引擎：已连接")
         else:
-            st.error("○ Gemini 引擎：未配置")
+            st.error("○ Gemini 引擎：未配置 (请上方输入 Key)")
             
-        if SEC_TS_TOKEN:
+        if DEFAULT_TS_TOKEN:
             st.success("● 数据同步器：已就绪")
         else:
             st.warning("○ 数据同步器：未配置")
@@ -164,13 +177,13 @@ def main_app():
         with sc2:
             st.write("")
             if st.button("🛰️ 同步数据"):
-                if not SEC_TS_TOKEN: st.error("后台未配置 Tushare Token")
+                if not DEFAULT_TS_TOKEN: st.error("后台未配置 Tushare Token")
                 elif not stock_code: st.warning("请输入代码")
                 else:
                     with st.spinner("实时数据抓取中..."):
                         f_code = TushareEngine.format_code(stock_code)
-                        d = TushareEngine.get_data("daily", SEC_TS_TOKEN, {"ts_code": f_code, "limit": 1})
-                        b = TushareEngine.get_data("daily_basic", SEC_TS_TOKEN, {"ts_code": f_code, "limit": 1})
+                        d = TushareEngine.get_data("daily", DEFAULT_TS_TOKEN, {"ts_code": f_code, "limit": 1})
+                        b = TushareEngine.get_data("daily_basic", DEFAULT_TS_TOKEN, {"ts_code": f_code, "limit": 1})
                         if d is not None and not d.empty:
                             st.session_state.stock_data["price"] = float(d.iloc[0]['close'])
                             st.session_state.stock_data["change"] = float(d.iloc[0]['pct_chg'])
@@ -214,15 +227,16 @@ def main_app():
             st.rerun()
 
         if submit_diagnosis:
-            if not SEC_GEMINI_KEY:
-                st.error("❌ 诊断失败：后台未配置 API Key。")
+            if not effective_api_key:
+                st.error("❌ 诊断失败：请在左侧侧边栏输入有效的 Google API Key。")
             elif not name_input:
                 st.error("请输入名称。")
             else:
                 with st.spinner("AI 专家正在扫描并执行联网搜索..."):
                     imgs_b64 = GeminiAnalyst.process_images(up_files) if up_files else None
                     prompt_text = f"目标:{name_input}, 价格:{price_input}, 涨跌:{chg_input}%, PE:{pe_input}, PB:{pb_input}, ROE:{roe_input}%, 行业:{industry_input}, 趋势:{ma_input}, 量能:{vol_input}"
-                    res_text, src_links = GeminiAnalyst.analyze_stock(prompt_text, SEC_GEMINI_KEY, imgs_b64, persona=persona, use_search=enable_search, use_radar=enable_radar)
+                    # 关键修改：传入 effective_api_key
+                    res_text, src_links = GeminiAnalyst.analyze_stock(prompt_text, effective_api_key, imgs_b64, persona=persona, use_search=enable_search, use_radar=enable_radar)
                     st.session_state.last_report = res_text
                     st.divider()
                     st.success(f"📈 {name_input} 投研诊断研报")
@@ -248,14 +262,18 @@ def main_app():
             for chat in st.session_state.chat_history:
                 with st.chat_message(chat["role"]): st.markdown(chat["content"])
             if query_input := st.chat_input("追问专家："):
-                st.session_state.chat_history.append({"role": "user", "content": query_input})
-                with st.chat_message("user"): st.markdown(query_input)
-                with st.chat_message("assistant"):
-                    with st.spinner("专家正在思考..."):
-                        follow_up_prompt = f"基于报告：\n{st.session_state.last_report}\n\n回答：{query_input}"
-                        ans_text, _ = GeminiAnalyst.analyze_stock(follow_up_prompt, SEC_GEMINI_KEY, persona=persona)
-                        st.markdown(ans_text)
-                        st.session_state.chat_history.append({"role": "assistant", "content": ans_text})
+                if not effective_api_key:
+                    st.error("请先在左侧输入 API Key")
+                else:
+                    st.session_state.chat_history.append({"role": "user", "content": query_input})
+                    with st.chat_message("user"): st.markdown(query_input)
+                    with st.chat_message("assistant"):
+                        with st.spinner("专家正在思考..."):
+                            follow_up_prompt = f"基于报告：\n{st.session_state.last_report}\n\n回答：{query_input}"
+                            # 关键修改：传入 effective_api_key
+                            ans_text, _ = GeminiAnalyst.analyze_stock(follow_up_prompt, effective_api_key, persona=persona)
+                            st.markdown(ans_text)
+                            st.session_state.chat_history.append({"role": "assistant", "content": ans_text})
 
     # --- Tab 3: 判定手册 (增强教学) ---
     with tab_guide:
