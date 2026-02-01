@@ -116,7 +116,7 @@ def main_app():
     if 'last_report' not in st.session_state: st.session_state.last_report = ""
     if 'chat_history' not in st.session_state: st.session_state.chat_history = []
 
-    st.title("🚀 Gemini 2.5 视觉量化诊断系统")
+    st.title("🚀 视觉量化诊断系统")
     st.caption("核心能力：Secrets 安全加密 | 2.5 Preview 引擎 | 联网搜索 | 技术教学手册")
     st.markdown("---")
     
@@ -131,9 +131,9 @@ def main_app():
             gemini_key_from_secrets = ""
             
         if gemini_key_from_secrets:
-            st.success("✅ Gemini Key: 已从 Secrets 安全加载")
+            st.success("✅ AI Key: 已从 Secrets 安全加载")
             # 提供覆盖选项
-            if st.toggle("临时手动修改 Gemini Key"):
+            if st.toggle("临时手动修改 AI Key"):
                 gemini_key = st.text_input("输入新 Key (仅本次有效)", type="password", key="manual_gemini")
             else:
                 gemini_key = gemini_key_from_secrets
@@ -287,14 +287,14 @@ def main_app():
         
         # 1. 视频教学
         st.subheader("📺 视频教学课堂")
-        st.caption("提示：以下视频来源于 YouTube，如果无法加载，请检查您的网络环境。")
+        st.caption("提示：以下视频来源于 B站，如果无法加载，请检查您的网络环境。")
         v_col1, v_col2 = st.columns(2)
         with v_col1:
-            st.info("🎥 股票 K 线基础教学")
-            st.video("https://www.youtube.com/watch?v=R7D10Gis6kU")
+            st.info("🎥 基础教学")
+            st.video("https://www.bilibili.com/video/BV1MsPWeUEXH?t=2.5")
         with v_col2:
-            st.info("🎥 成交量与主力逻辑")
-            st.video("https://www.youtube.com/watch?v=n98N0H7yB9M")
+            st.info("🎥 K线")
+            st.video("https://www.bilibili.com/video/BV1MsPWeUEXH?t=2.5&p=5")
 
         st.divider()
         
@@ -363,3 +363,4 @@ def main_app():
 
 if __name__ == "__main__":
     main_app()
+
