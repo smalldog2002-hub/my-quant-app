@@ -10,24 +10,13 @@ from io import BytesIO
 from PIL import Image
 
 # ==========================================
-# 0. 安全配置 (初始化默认值)
-# ==========================================
-try:
-    # 尝试从 Secrets 读取，如果没有则为空
-    DEFAULT_GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "")
-    DEFAULT_TS_TOKEN = st.secrets.get("TUSHARE_TOKEN", "")
-except Exception:
-    DEFAULT_GEMINI_KEY = ""
-    DEFAULT_TS_TOKEN = ""
-
-# ==========================================
 # 1. 数据驱动引擎 (Tushare API)
 # ==========================================
 class TushareEngine:
     @staticmethod
     def get_data(api_name, token, params, fields=""):
         if not token:
-            st.error("❌ Tushare Token 未配置")
+            st.error("❌ Tushare Token 未配置，无法获取数据")
             return None
         url = "http://api.tushare.pro"
         payload = {"api_name": api_name, "token": token, "params": params, "fields": fields}
@@ -39,7 +28,7 @@ class TushareEngine:
                     data = res.get("data")
                     return pd.DataFrame(data["items"], columns=data["fields"])
                 else:
-                    st.error(f"Tushare 错误: {res.get('msg')}")
+                    st.error(f"Tushare 接口报错: {res.get('msg')}")
         except Exception as e:
             st.error(f"Tushare 连接失败: {str(e)}")
         return None
@@ -76,7 +65,7 @@ class GeminiAnalyst:
     @staticmethod
     def analyze_stock(prompt, api_key, images_base64=None, persona="平衡派", use_search=True, use_radar=True):
         if not api_key:
-            return "❌ API Key 缺失。请在侧边栏输入有效的 Google API Key。", []
+            return "❌ API Key 缺失。请在侧边栏配置 Secrets 或手动输入。", []
 
         model_id = "gemini-2.5-flash-preview-09-2025" 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key}"
@@ -131,27 +120,45 @@ def main_app():
     st.caption("核心能力：Secrets 安全加密 | 2.5 Preview 引擎 | 联网搜索 | 技术教学手册")
     st.markdown("---")
     
+    # --- 侧边栏：安全 API 管理 ---
     with st.sidebar:
-        st.header("🔑 API 配置")
-        # 新增：手动输入 API Key 的地方
-        manual_key = st.text_input("Google API Key (手动输入)", type="password", placeholder="在此粘贴新 Key 覆盖默认设置")
+        st.header("🔑 API 密钥管理")
         
-        # 逻辑：如果有手动输入的 Key，就用手动的；否则尝试用 Secrets 里的
-        effective_api_key = manual_key if manual_key else DEFAULT_GEMINI_KEY
-        
+        # 1. Gemini Key 管理逻辑
+        try:
+            gemini_key_from_secrets = st.secrets.get("GEMINI_API_KEY", "")
+        except:
+            gemini_key_from_secrets = ""
+            
+        if gemini_key_from_secrets:
+            st.success("✅ Gemini Key: 已从 Secrets 安全加载")
+            # 提供覆盖选项
+            if st.toggle("临时手动修改 Gemini Key"):
+                gemini_key = st.text_input("输入新 Key (仅本次有效)", type="password", key="manual_gemini")
+            else:
+                gemini_key = gemini_key_from_secrets
+        else:
+            st.warning("⚠️ 未检测到 Secrets 配置")
+            gemini_key = st.text_input("请输入 Gemini API Key", type="password", help="刷新页面需重新输入，建议配置 Secrets", key="manual_gemini_input")
+
         st.markdown("---")
-        st.header("🛡️ 系统运行状态")
-        
-        if effective_api_key:
-            st.success("● Gemini 引擎：已连接")
-        else:
-            st.error("○ Gemini 引擎：未配置 (请上方输入 Key)")
+
+        # 2. Tushare Token 管理逻辑
+        try:
+            ts_token_from_secrets = st.secrets.get("TUSHARE_TOKEN", "")
+        except:
+            ts_token_from_secrets = ""
             
-        if DEFAULT_TS_TOKEN:
-            st.success("● 数据同步器：已就绪")
+        if ts_token_from_secrets:
+            st.success("✅ Tushare Token: 已从 Secrets 安全加载")
+            if st.toggle("临时手动修改 Tushare Token"):
+                ts_token = st.text_input("输入新 Token (仅本次有效)", type="password", key="manual_ts")
+            else:
+                ts_token = ts_token_from_secrets
         else:
-            st.warning("○ 数据同步器：未配置")
-            
+            st.info("ℹ️ Tushare Token (用于拉取数据)")
+            ts_token = st.text_input("请输入 Tushare Token", type="password", key="manual_ts_input")
+
         st.divider()
         persona = st.radio("专家诊断风格选择：", ["平衡派", "价值派", "技术派"], index=0)
         
@@ -177,13 +184,13 @@ def main_app():
         with sc2:
             st.write("")
             if st.button("🛰️ 同步数据"):
-                if not DEFAULT_TS_TOKEN: st.error("后台未配置 Tushare Token")
+                if not ts_token: st.error("请先配置 Tushare Token")
                 elif not stock_code: st.warning("请输入代码")
                 else:
                     with st.spinner("实时数据抓取中..."):
                         f_code = TushareEngine.format_code(stock_code)
-                        d = TushareEngine.get_data("daily", DEFAULT_TS_TOKEN, {"ts_code": f_code, "limit": 1})
-                        b = TushareEngine.get_data("daily_basic", DEFAULT_TS_TOKEN, {"ts_code": f_code, "limit": 1})
+                        d = TushareEngine.get_data("daily", ts_token, {"ts_code": f_code, "limit": 1})
+                        b = TushareEngine.get_data("daily_basic", ts_token, {"ts_code": f_code, "limit": 1})
                         if d is not None and not d.empty:
                             st.session_state.stock_data["price"] = float(d.iloc[0]['close'])
                             st.session_state.stock_data["change"] = float(d.iloc[0]['pct_chg'])
@@ -227,16 +234,16 @@ def main_app():
             st.rerun()
 
         if submit_diagnosis:
-            if not effective_api_key:
-                st.error("❌ 诊断失败：请在左侧侧边栏输入有效的 Google API Key。")
+            if not gemini_key:
+                st.error("❌ 诊断失败：请在左侧配置有效的 Gemini API Key。")
             elif not name_input:
                 st.error("请输入名称。")
             else:
                 with st.spinner("AI 专家正在扫描并执行联网搜索..."):
                     imgs_b64 = GeminiAnalyst.process_images(up_files) if up_files else None
                     prompt_text = f"目标:{name_input}, 价格:{price_input}, 涨跌:{chg_input}%, PE:{pe_input}, PB:{pb_input}, ROE:{roe_input}%, 行业:{industry_input}, 趋势:{ma_input}, 量能:{vol_input}"
-                    # 关键修改：传入 effective_api_key
-                    res_text, src_links = GeminiAnalyst.analyze_stock(prompt_text, effective_api_key, imgs_b64, persona=persona, use_search=enable_search, use_radar=enable_radar)
+                    # 使用动态获取的 gemini_key
+                    res_text, src_links = GeminiAnalyst.analyze_stock(prompt_text, gemini_key, imgs_b64, persona=persona, use_search=enable_search, use_radar=enable_radar)
                     st.session_state.last_report = res_text
                     st.divider()
                     st.success(f"📈 {name_input} 投研诊断研报")
@@ -262,16 +269,15 @@ def main_app():
             for chat in st.session_state.chat_history:
                 with st.chat_message(chat["role"]): st.markdown(chat["content"])
             if query_input := st.chat_input("追问专家："):
-                if not effective_api_key:
-                    st.error("请先在左侧输入 API Key")
+                if not gemini_key:
+                    st.error("请先在左侧配置 API Key")
                 else:
                     st.session_state.chat_history.append({"role": "user", "content": query_input})
                     with st.chat_message("user"): st.markdown(query_input)
                     with st.chat_message("assistant"):
                         with st.spinner("专家正在思考..."):
                             follow_up_prompt = f"基于报告：\n{st.session_state.last_report}\n\n回答：{query_input}"
-                            # 关键修改：传入 effective_api_key
-                            ans_text, _ = GeminiAnalyst.analyze_stock(follow_up_prompt, effective_api_key, persona=persona)
+                            ans_text, _ = GeminiAnalyst.analyze_stock(follow_up_prompt, gemini_key, persona=persona)
                             st.markdown(ans_text)
                             st.session_state.chat_history.append({"role": "assistant", "content": ans_text})
 
@@ -285,7 +291,6 @@ def main_app():
         v_col1, v_col2 = st.columns(2)
         with v_col1:
             st.info("🎥 股票 K 线基础教学")
-            # 更换了点击量更高、更稳定的链接
             st.video("https://www.youtube.com/watch?v=R7D10Gis6kU")
         with v_col2:
             st.info("🎥 成交量与主力逻辑")
@@ -304,8 +309,6 @@ def main_app():
                 - 下影线长度至少是实体的 2 倍以上。
                 - 几乎没有上影线。
                 
-                
-                
                 **操盘建议**：
                 出现在连续下跌的底部，预示着空头抛压耗尽，主力资金在低位试探性买入。
                 """)
@@ -314,8 +317,6 @@ def main_app():
                 **形态特征**：
                 - 由三根 K 线组成：长阴线 + 小十字星 + 长阳线。
                 - 意味着股价由跌转平，再由平转涨。
-                
-                
                 
                 **操盘建议**：
                 典型的反转信号。如果第三根阳线伴随成交量放大，可靠性极高。
@@ -326,8 +327,6 @@ def main_app():
                 **形态特征**：
                 - 阳线后跟一根高开的阴线，且阴线收盘价深入阳线实体一半以下。
                 
-                
-                
                 **操盘建议**：
                 出现在高位，意味着多头力量衰竭，主力正在撤离。
                 """)
@@ -335,8 +334,6 @@ def main_app():
                 st.markdown("""
                 **形态特征**：
                 - 连续出现三根收盘在最低点附近的长阴线。
-                
-                
                 
                 **操盘建议**：
                 极强的看跌信号，暗示趋势已彻底转空，应坚决回避。
